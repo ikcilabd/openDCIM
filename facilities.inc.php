@@ -30,11 +30,9 @@
 
 date_default_timezone_set($config->ParameterArray['timezone']);
 
-require_once( "assets.inc.php" );
-require_once( "customers.inc.php" );
-require_once( "infrastructure.inc.php" );
-require_once( "power.inc.php" );
-require_once( "config.inc.php" );
+// Pull in the Composer autoloader
+require_once( __DIR__ . "/vendor/autoload.php" );
+
 require_once( "misc.inc.php" );
 
 // SNMP Library, don't attempt to load without php-snmp extensions
@@ -42,6 +40,5 @@ if(extension_loaded('snmp')){
 	require_once('OSS_SNMP/SNMP.php');
 }
 
-require_once( "logging.inc.php" );
 
 ?>

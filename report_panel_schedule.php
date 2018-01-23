@@ -45,7 +45,7 @@
 <?php include( 'sidebar.inc.php' ); ?>
 <div class="main">
 <div class="center"><div>
-<form action="<?php echo $_SERVER['PHP_SELF']; ?>" method="post" id="panelform">
+<form method="post" id="panelform">
 
 <?php
 	if ( @$_REQUEST['datacenterid'] == 0 ) {
@@ -133,6 +133,11 @@
 			$pnlList[$pnlCount]->PanelID = $pnlID;
 			$pnlList[$pnlCount]->GetPanel();
 		}
+	}
+
+	if ( sizeof( $pnlList ) == 0 ) {
+		echo '<meta http-equiv="refresh" content="0">';
+		exit;
 	}
     
     //

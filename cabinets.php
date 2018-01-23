@@ -100,7 +100,7 @@
 		$cab->Keylock=null;
 		$cab->MaxKW=null;
 		$cab->MaxWeight=null;
-		$cab->InstallationDate=date('m/d/Y');
+		$cab->InstallationDate=date('Y-m-d');
 	}
 
 	$deptList=$dept->GetDepartmentList();
@@ -127,7 +127,7 @@
   <link rel="stylesheet" href="css/inventory.php" type="text/css">
   <link rel="stylesheet" href="css/jquery-ui.css" type="text/css">
   <link rel="stylesheet" href="css/validationEngine.jquery.css" type="text/css">
-  <link rel="stylesheet" href="css/jHtmlArea.css" type="text/css">
+  <link rel="stylesheet" href="css/jquery-te-1.4.0.css" type="text/css">
   <!--[if lt IE 9]>
   <link rel="stylesheet"  href="css/ie.css" type="text/css">
   <![endif]-->
@@ -135,9 +135,9 @@
   <script type="text/javascript" src="scripts/jquery-ui.min.js"></script>
   <script type="text/javascript" src="scripts/jquery.validationEngine-en.js"></script>
   <script type="text/javascript" src="scripts/jquery.validationEngine.js"></script>
-  <script type="text/javascript" src="scripts/jHtmlArea-0.8.min.js"></script>
+  <script type="text/javascript" src="scripts/jquery-te-1.4.0.min.js"></script>
   <script type="text/javascript" src="scripts/jquery.textext.js"></script>
-  <script type="text/javascript" src="scripts/common.js"></script>
+  <script type="text/javascript" src="scripts/common.js?v<?php echo filemtime('scripts/common.js');?>"></script>
 
   <script type="text/javascript">
 	$(document).ready(function() {
@@ -202,8 +202,16 @@
 		// Init form
 		$('#datacenterid').trigger('change');
 
+		$("#cabinetid").combobox();
+		$("#datacenterid").combobox();
+		$("#assignedto").combobox();
+		$("#zoneid").combobox();
+		$("#cabrowid").combobox();
+
+		$('span.custom-combobox').width($('span.custom-combobox').width()+2);
+
 		$('#rackform').validationEngine({});
-		$('input[name="installationdate"]').datepicker({});
+		$('input[name="installationdate"]').datepicker({dateFormat: "yy-mm-dd"});
 		$('#tags').width($('#tags').parent('div').parent('div').innerWidth()-$('#tags').parent('div').prev('div').outerWidth()-5);
 		
 		$('#tags').textext({
@@ -232,7 +240,7 @@ echo '<div class="main">
 <div class="table">
 <div>
    <div>',__("Cabinet"),'</div>
-   <div><select name="cabinetid">
+   <div><select name="cabinetid" id="cabinetid">
    <option value=0>',__("New Cabinet"),'</option>';
 
 	foreach($cabList as $cabRow){
@@ -262,7 +270,7 @@ echo '		</select>
 </div>
 <div>
   <div>',__("Assigned To"),':</div>
-  <div><select name="assignedto">
+  <div><select name="assignedto" id="assignedto">
     <option value=0>',__("General Use"),'</option>';
 
 	foreach($deptList as $deptRow){
@@ -315,7 +323,7 @@ echo '</select></div>
 </div>
 <div>
    <div>',__("Date of Installation"),'</div>
-   <div><input type="text" name="installationdate" size=15 value="',date('m/d/Y', strtotime($cab->InstallationDate)),'"></div>
+   <div><input type="text" name="installationdate" size=15 value="',date('Y-m-d', strtotime($cab->InstallationDate)),'"></div>
 </div>
 <div>
 	<div><label for="tags">',__("Tags"),'</label></div>

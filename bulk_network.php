@@ -1,7 +1,11 @@
 <?php
 	require_once('db.inc.php');
 	require_once('facilities.inc.php');
-  require_once('PHPExcel/PHPExcel/IOFactory.php');
+
+  if(!$person->BulkOperations){
+    header('Location: '.redirect());
+    exit;
+  }
 
 //	Uncomment these if you need/want to set a title in the header
 //	$header=__("");
@@ -31,7 +35,7 @@
 
     $_SESSION['inputfile'] = $targetFile;
 
-    echo "<meta http-equiv='refresh' content='0; url=" . $_SERVER['PHP_SELF'] . "?stage=headers'>";
+    echo "<meta http-equiv='refresh' content='0; url=" . $_SERVER['SCRIPT_NAME'] . "?stage=headers'>";
     exit;
   } elseif ( isset( $_REQUEST['stage'] ) && $_REQUEST['stage'] == 'headers' ) {
     //
@@ -54,8 +58,9 @@
     // We're good, so now get the top row so that we can map it out to fields
 
     $content = "<h3>" . __("Pick the appropriate column header (line 1) for each field name listed below." ) . "</h3>";
+    $content .= "<h3>" . __("Mouse over each field for help text.") . "</h3>";
 
-    $content .= '<form action="' . $_SERVER['PHP_SELF'] . '" method="POST">
+    $content .= '<form method="POST">
                     <input type="hidden" name="stage" value="process">
                     <div class="table">';
 
@@ -73,9 +78,9 @@
 
     $fieldNum = 1;
 
-    foreach ( array( "SourceDeviceID", "SourcePort", "TargetDeviceID", "TargetPort", "MediaType", "ColorCode", "Notes" ) as $fieldName ) {
+    foreach ( array( "SourceDeviceID"=>"The key value to indicate the existing device the connection originates from.", "SourcePort"=>"The name of the existing port for the origination of the connection.", "TargetDeviceID"=>"The key value to indicate the existing device the connection terminates at.", "TargetPort"=>"The name of the existing port for the termination of the connection.", "MediaType"=>"Optional, but if specified the name must match an existing Media Type in the openDCIM installation.", "ColorCode"=>"Optional, but if specified the name must match an existing Color name in the openDCIM installation.", "Notes"=>"Optional, free form text to add to the Notes field for the connection." ) as $fieldName=>$helpText ) {
       $content .= '<div>
-                    <div>' . __($fieldName) . ': </div><div><select name="' . $fieldName . '">';
+                    <div><span title="' . __($helpText) . '">' . __($fieldName) . '</span>: </div><div><select name="' . $fieldName . '">';
       for ( $n = 0; $n < sizeof( $fieldList ); $n++ ) {
         if ( $n == $fieldNum )
             $selected = "SELECTED";
@@ -92,7 +97,7 @@
       $fieldNum++;
     }
 
-    $content .= "<div><div>" . __("Type of Device ID") . "</div><div><select name='IDType'>";
+    $content .= "<div><div><span title=\"" . __("The type of key field that is being used to match devices in openDCIM.  Only one type may be specified per file.") . "\">" . __("KeyField") . "</span></div><div><select name='KeyField'>";
     foreach( array( "Label", "Hostname", "AssetTag", "SerialNo" ) as $option ) {
       $content .= "<option val=\"$option\">$option</option>";
     }
@@ -136,7 +141,7 @@
     $st->execute();
     $media = array();
     while ( $row = $st->fetch() ) {
-      $media[strtoupper($row['MediaType'])] = $row['ColorID'];
+      $media[strtoupper($row['MediaType'])] = $row['MediaID'];
     }
 
     // Also make sure we start with an empty string to display
@@ -144,15 +149,17 @@
     $fields = array( "SourceDeviceID", "SourcePort", "TargetDeviceID", "TargetPort", "MediaType", "ColorCode", "Notes" );
 
     for ( $n = 2; $n <= $highestRow; $n++ ) {
+      $rowError = false;
+
       $devPort = new DevicePorts();
  
       // Load up the $row[] array with the values according to the mapping supplied by the user
       foreach( $fields as $fname ) {
         $addr = chr( 64 + $_REQUEST[$fname]);
-        $row[$fname] = $sheet->getCell( $addr . $n )->getValue();
+        $row[$fname] = sanitize($sheet->getCell( $addr . $n )->getValue());
       }
 
-      switch( $_REQUEST["IDType"] ) {
+      switch( $_REQUEST["KeyField"] ) {
         case "Hostname":
           $idField = "PrimaryIP";
           break;
@@ -183,7 +190,7 @@
         $devPort->DeviceID = $val["DeviceID"];
       } else {
         $errors = true;
-        $content .= "<li>Source Device: $idField = " . $row["SourceDeviceID"] . " is not unique or not found.";
+        $content .= "<li>Source Device: $idField = " . $row["SourceDeviceID"] . " is not unique or not found.  Total = " . $val["TotalMatches"];
       }
 
       /*
@@ -202,7 +209,7 @@
         $devPort->ConnectedDeviceID = $val["DeviceID"];
       } else {
         $errors = true;
-        $content .= "<li>Target Device: $idField = " . $row["TargetDeviceID"] . " is not unique or not found.";
+        $content .= "<li>Target Device: $idField = " . $row["TargetDeviceID"] . " is not unique or not found.  Total = " . $val["TotalMatches"];
       }
 
       /*
@@ -210,7 +217,7 @@
        *  Section for looking up the SourcePort by name and setting the true PortNumber in the devPort variable
        *
        */
-      $st = $dbh->prepare( "select count(*) as TotalMatches, Label, PortNumber from fac_Ports where DeviceID=:DeviceID and ucase(Label)=ucase(:SourcePort)" );
+      $st = $dbh->prepare( "select count(*) as TotalMatches, Label, PortNumber from fac_Ports where DeviceID=:DeviceID and PortNumber>0 and ucase(Label)=ucase(:SourcePort)" );
       $st->execute( array( ":DeviceID"=>$devPort->DeviceID, ":SourcePort"=>$row["SourcePort"] ));
       if ( ! $val = $st->fetch() ) {
         $info = $dbh->errorInfo();
@@ -222,15 +229,16 @@
         $devPort->Label = $val["Label"];
       } else {
         $errors = true;
-        $content .= "<li>Source Port: " . $row["SourcePort"] . " is not unique or not found.";
+        $content .= "<li>Source Port: " . $row["SourcePort"] . " is not unique or not found.  Total = " . $val["TotalMatches"];
       }
 
       /*
        *
        *  Section for looking up the TargetPort by name and setting the true PortNumber in the devPort variable
+       *  Limits to positive port numbers so that you can match Patch Panel frontside ports
        *
        */
-      $st = $dbh->prepare( "select count(*) as TotalMatches, Label, PortNumber from fac_Ports where DeviceID=:DeviceID and ucase(Label)=ucase(:TargetPort)" );
+      $st = $dbh->prepare( "select count(*) as TotalMatches, Label, PortNumber from fac_Ports where DeviceID=:DeviceID and PortNumber>0 and ucase(Label)=ucase(:TargetPort)" );
       $st->execute( array( ":DeviceID"=>$devPort->ConnectedDeviceID, ":TargetPort"=>$row["TargetPort"] ));
       if ( ! $val = $st->fetch() ) {
         $info = $dbh->errorInfo();
@@ -241,7 +249,7 @@
         $devPort->ConnectedPort = $val["PortNumber"];
       } else {
         $errors = true;
-        $content .= "<li>Target Port: " . $row["TargetDeviceID"] . "::" . $row["TargetPort"] . " is not unique or not found.";
+        $content .= "<li>Target Port: " . $row["TargetDeviceID"] . "::" . $row["TargetPort"] . " is not unique or not found.  Total = " . $val["TotalMatches"];
       }
 
       // Do not fail if the Color Code or Media Type are not defined for the site.
@@ -255,13 +263,15 @@
 
       $devPort->Notes = $row["Notes"];
 
-      if ( ! $errors ) {
+      if ( ! $rowError ) {
         if ( ! $devPort->updatePort() ) {
           $errors = true;
         }
+      } else {
+        $errors = true;
       }
 
-      if ( $errors ) {
+      if ( $rowError ) {
         $content .= "<li><strong>Error making port connection on Row $n of the spreadsheet.</strong>";
       }
     }
@@ -276,7 +286,7 @@
     //  No parameters were passed with the URL, so this is the top level, where
     //  we need to ask for the user to specify a file to upload.
     //
-    $content = '<form action="' . $_SERVER['PHP_SELF']. '" method="POST" ENCTYPE="multipart/form-data">';
+    $content = '<form method="POST" ENCTYPE="multipart/form-data">';
     $content .= '<div class="table">
                   <div>
                     <div>' . __("Select file to upload:") . '

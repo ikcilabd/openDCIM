@@ -1,5 +1,5 @@
 <?php
-$codeversion="4.2";
+$codeversion="4.4.1";
 
 require_once( "preflight.inc.php" );
 
@@ -133,7 +133,7 @@ function ArraySearchRecursive($Needle,$Haystack,$NeedleKey="",$Strict=false,$Pat
 	$usePeople=($result->rowCount()>0 && !ArraySearchRecursive('fac_People',$test))?($result->rowCount()>0 && !ArraySearchRecursive('fac_people',$test))?false:true:true;
 
 	// New install so create a user
-	require_once("customers.inc.php");
+	require_once("classes/People.class.php");
 
 	if($usePeople){
 		$person=new People();
@@ -143,7 +143,7 @@ function ArraySearchRecursive($Needle,$Haystack,$NeedleKey="",$Strict=false,$Pat
 	}
 	if(AUTHENTICATION=="Apache"){
 		$person->UserID=$_SERVER['REMOTE_USER'];
-	}elseif(AUTHENTICATION=="Oauth" || AUTHENTICATION=="LDAP"){
+	}elseif(AUTHENTICATION=="Oauth" || AUTHENTICATION=="LDAP" || AUTHENTICATION=="Saml"){
 		$person->UserID=$_SESSION['userid'];
 	}
 	/* Check the table to see if there are any users
@@ -181,7 +181,7 @@ function ArraySearchRecursive($Needle,$Haystack,$NeedleKey="",$Strict=false,$Pat
 		exit;
 		$rightserror=1;
 	}else{ // so we have users and at least one site admin
-		require_once("customers.inc.php");
+		require_once("classes/People.class.php");
 
 		if(!$person->SiteAdmin){
 			// dolemite says you aren't an admin so you can't apply the update
@@ -806,7 +806,7 @@ function upgrade(){
 				$this->AssetTag=transform($this->AssetTag);
 				
 				$sql="INSERT INTO fac_Device SET Label=\"$this->Label\", SerialNo=\"$this->SerialNo\", AssetTag=\"$this->AssetTag\", 
-					PrimaryIP=\"$this->PrimaryIP\", SNMPCommunity=\"$this->SNMPCommunity\", ESX=$this->ESX, Owner=$this->Owner, 
+					PrimaryIP=\"$this->PrimaryIP\", SNMPCommunity=\"$this->SNMPCommunity\", Hypervisor=$this->Hypervisor, Owner=$this->Owner, 
 					EscalationTimeID=$this->EscalationTimeID, EscalationID=$this->EscalationID, PrimaryContact=$this->PrimaryContact, 
 					Cabinet=$this->Cabinet, Position=$this->Position, Height=$this->Height, Ports=$this->Ports, 
 					FirstPortNum=$this->FirstPortNum, TemplateID=$this->TemplateID, NominalWatts=$this->NominalWatts, 
@@ -1077,6 +1077,7 @@ function upgrade(){
 
 		// Rebuild the config table just in case.
 		$config->rebuild();
+		$version="4.1";
 	}
 	if($version=="4.1"){
 		// First apply the schema updates needed.
@@ -1084,6 +1085,7 @@ function upgrade(){
 
 		// Rebuild the config table just in case.
 		$config->rebuild();
+		$version="4.1.1";
 	}
 	if($version=="4.1.1"){
 		// First apply the schema updates needed.
@@ -1091,6 +1093,52 @@ function upgrade(){
 
 		// Rebuild the config table just in case.
 		$config->rebuild();		
+		$version="4.2";
+	}
+	if($version=="4.2"){
+		$results[]=applyupdate("db-4.2-to-4.3.sql");
+
+		$config->rebuild();
+		$version="4.3";
+	}
+	if($version=="4.3"){
+		$results[]=applyupdate("db-4.3-to-4.3.1.sql");
+
+		$config->rebuild();
+	}
+	if($version=="4.3.1"){
+		$results[]=applyupdate("db-4.3.1-to-4.4.sql");
+
+		$config->rebuild();
+	}
+	if($version=="4.4"){
+		$results[]=applyupdate("db-4.4-to-4.5.sql");
+
+		$st = $dbh->prepare( "select * from fac_Decommission order by SurplusDate ASC" );
+		$dt = $dbh->prepare( "insert into fac_Device set Label=:Label, SerialNo=:SerialNo, AssetTag=:AssetTag, Status='Disposed'" );
+		$lt = $dbh->prepare( "insert into fac_DispositionMembership values (1, :DeviceID, :DispositionDate, :DisposedBy )");
+
+		// Fetch from the legacy surplus table
+		$st->execute( array() );
+		while ( $row = $st->fetch() ) {
+			// Insert a new device for this one
+			$dt->execute( array( ":Label"=>$row["Label"],
+					":SerialNo"=>$row["SerialNo"],
+					":AssetTag"=>$row["AssetTag"] ));
+
+			// Get the new DeviceID (yes, I know, these all were originally in the fac_Device table)
+			$devID = $dbh->lastInsertId();
+
+			// Now add the logging / membership record
+			$lt->execute( array( ":DeviceID"=>$devID,
+				":DispositionDate"=>$row["SurplusDate"],
+				":DisposedBy"=>$row["UserID"]));
+		}
+
+		// Now shit can the old table
+		$dbh->query( "DROP TABLE fac_Decommission" );
+
+		$config->rebuild();
 	}
 }
 
@@ -1277,45 +1325,6 @@ if(isset($results)){
 		Config::UpdateParameter( 'LDAPSiteAdmin', $_REQUEST['LDAPSiteAdmin']);
 	}
 
-// Synchronization
-	if ( isset( $_POST["repoaction"] ) && $_POST["repoaction"] == "Sync" ) {
-		$c = curl_init('https://repository.opendcim.org/api/manufacturer');
-		
-		curl_setopt( $c, CURLOPT_CONNECTTIMEOUT, 30 );
-		curl_setopt( $c, CURLOPT_USERAGENT, "Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1)");
-		curl_setopt( $c, CURLOPT_RETURNTRANSFER, true );
-		curl_setopt( $c, CURLOPT_COOKIEFILE, "/tmp/repocookies.txt" );
-		curl_setopt( $c, CURLOPT_COOKIEJAR, "/tmp/repocookies.txt" );
-		curl_setopt( $c, CURLOPT_FOLLOWLOCATION, 1 );
-		curl_setopt( $c, CURLOPT_CUSTOMREQUEST, 'GET' );
-		
-		$result = curl_exec( $c );
-		$jr = json_decode( $result );
-		$m = new Manufacturer();
-		
-		if ( is_array( $jr->manufacturers ) ) {
-			foreach( $jr->manufacturers as $tmpman ) {
-				$m->GlobalID = $tmpman->ManufacturerID;
-				if ( $m->getManufacturerByGlobalID() ) { 
-					$m->Name = $tmpman->Name;
-					$m->UpdateManufacturer();
-				} else {
-					// We don't already have this one linked, so search for a candidate or add as a new one
-					$m->Name = $tmpman->Name;
-					if ( $m->GetManufacturerByName() ) {
-						// Reset to the values from the repo (especially CaSe)
-						$m->GlobalID = $tmpman->ManufacturerID;
-						$m->Name = $tmpman->Name;
-						$m->UpdateManufacturer();
-					} else {
-						$m->ManufacturerID = $tmpman->ManufacturerID;
-						$m->Name = $tmpman->Name;
-						$m->CreateManufacturer();
-					}
-				}
-			}
-		}
-	}
 	
 //Installation Complete
 	if($nodept=="" && $nodc=="" && $nocab==""){ // All three primary sections have had at least one item created
@@ -1375,7 +1384,7 @@ if(isset($results)){
 <h3>Data Center Department Detail</h3>
 <?php echo $nodept; ?>
 <div class="center"><div>
-<form action="<?php echo $_SERVER['PHP_SELF']; ?>?dept&preflight-ok" method="POST">
+<form action="<?php echo $_SERVER['SCRIPT_NAME']; ?>?dept&preflight-ok" method="POST">
 <div class="table centermargin">
 <div>
    <div>Department</div>
@@ -1453,7 +1462,7 @@ if(isset($results)){
 <h3>Data Center Detail</h3>
 <?php echo $nodc; ?>
 <div class="center"><div>
-<form action="<?php echo $_SERVER['PHP_SELF']; ?>?dc&preflight-ok" method="POST">
+<form action="<?php echo $_SERVER['SCRIPT_NAME']; ?>?dc&preflight-ok" method="POST">
 <div class="table">
 <div>
    <div><label for="datacenterid">Data Center ID</label></div>
@@ -1544,7 +1553,7 @@ if(isset($results)){
 <h3>Data Center Cabinet Inventory</h3>
 <?php echo $nodccab; ?>
 <div class='center'><div>
-<form action='<?php echo $_SERVER['PHP_SELF']; ?>?cab&preflight-ok' method='POST'>
+<form action='<?php echo $_SERVER['SCRIPT_NAME']; ?>?cab&preflight-ok' method='POST'>
 <?php echo '
 <div class="table">
 <div>
@@ -1644,7 +1653,7 @@ echo '
 <h3>Installation Complete</h3>
 <?php echo $nodccab; ?>
 <div class='center'><div>
-<form action="<?php echo $_SERVER['PHP_SELF']; ?>?ldap&preflight-ok" method="POST">
+<form action="<?php echo $_SERVER['SCRIPT_NAME']; ?>?ldap&preflight-ok" method="POST">
 <?php
 echo '<div id="ldap">
 	<h3>',__("LDAP Authentication and Authorization Configuration"),'</h3>
@@ -1738,12 +1747,7 @@ echo '<div id="ldap">
 <h2>Online Repository</h2>
 <p>If you wish to synchronize with the online repository, you must first pull the current listing of Manufacturer Names, which requires an active connection to the internet
 from the server running openDCIM.  In order to allow you to restrict connections as much as possible, the entire process runs across an SSL connection to
-https://repository.opendcim.org.  Once you have synchronized the Manufacturer Names, you may subscribe to each line of equipment by manufacturer.  Subscriptions will be
-updated as you run [install_dir]/repository_sync.php manually or via a cron job.  It is requested that you do not attempt to synchronize more than once per day in order to
-reduce bandwidth requirements at the repository.</p>
-<p>To initiate the initial pull of manufacturer data, click the button below.</p>
-<form action="<?php echo $_SERVER['PHP_SELF']; ?>?repo&preflight-ok" method="POST">
-<input type="submit" name="repoaction" value="Sync">
+https://repository.opendcim.org.  This process is managed through the Template Management -> Repository Sync interface.  Once you have a manufacturer synchronized, you may download individual templates for that manufacturer.</p>
 </form>
 
 </div></div>

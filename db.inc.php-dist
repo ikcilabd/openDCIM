@@ -20,7 +20,8 @@
 	$codeset = "UTF-8";
 
 	$pdo_options=array(
-		PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES utf8'
+		PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES utf8',
+		PDO::ATTR_PERSISTENT => true
 	);
 
 	try{
@@ -41,6 +42,11 @@
 	   ex.  cp oauth/login_with_google.php oauth/login.php
 	*/
 		// define( "AUTHENTICATION", "Oauth" );
+
+	/* If you want to use Saml authentication, comment the above defines for AUTHENTICATION,
+           uncomment the Saml define below
+	*/
+		// define( "AUTHENTICATION", "Saml" );
 
 	/* 	LDAP authentication and authorization, which is far from simple.
 		Don't even try to enable this unless you know how to query

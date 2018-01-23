@@ -23,8 +23,10 @@ class PDF extends FPDF {
   
 	function Header() {
 		$this->pdfconfig = new Config();
-		$this->Link( 10, 8, 100, 20, 'https://' . $_SERVER['SERVER_NAME'] . $_SERVER['PHP_SELF'] );
-    	$this->Image( 'images/' . $this->pdfconfig->ParameterArray['PDFLogoFile'],10,8,100);
+		$this->Link( 10, 8, 100, 20, 'https://' . $_SERVER['SERVER_NAME'] . $_SERVER['SCRIPT_NAME'] );
+        if ( file_exists( 'images/' . $this->pdfconfig->ParameterArray['PDFLogoFile'] )) {
+            $this->Image( 'images/' . $this->pdfconfig->ParameterArray['PDFLogoFile'],10,8,100);
+        }
     	$this->SetFont($this->pdfconfig->ParameterArray['PDFfont'],'B',12);
     	$this->Cell(120);
     	$this->Cell(30,20,__("Information Technology Services"),0,0,'C');
@@ -146,6 +148,7 @@ class PDF extends FPDF {
 	$pdf->SetTextColor( 0 );
 
 	$pdf->Bookmark( 'Departments' );
+	$pdf->AddPage();
 	$deptList = $dept->GetDepartmentList();
 
 	foreach( $deptList as $deptRow ) {
@@ -153,7 +156,6 @@ class PDF extends FPDF {
 		// if ( $deptRow->Name == 'ITS' )
 		// 	continue;
 
-		$pdf->AddPage();
 		$pdf->Bookmark( $deptRow->Name, 1, 0 );
 		$pdf->SetFont( $config->ParameterArray['PDFfont'], 'B', 12 );
 		$pdf->Cell( 80, 5, __("Department").":" );

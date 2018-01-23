@@ -14,8 +14,8 @@
 			$dir=scandir($path);
 			foreach($dir as $i => $f){
 				if(is_file($path.DIRECTORY_SEPARATOR.$f) && ($f!='.' && $f!='..' && $f!='P_ERROR.png')){
-					@$imageinfo=getimagesize($path.DIRECTORY_SEPARATOR.$f);
-					if(preg_match('/^image/i', $imageinfo['mime'])){
+					$mimeType=mime_content_type($path.DIRECTORY_SEPARATOR.$f);
+					if(preg_match('/^image/i', $mimeType)){
 						$array[$path][]=$f;
 					}
 				}
@@ -44,7 +44,7 @@
   <script type="text/javascript" src="scripts/jquery.min.js"></script>
   <script type="text/javascript" src="scripts/jquery-ui.min.js"></script>
   <script type="text/javascript" src="scripts/jquery.uploadifive.js"></script>
-  <script type="text/javascript" src="scripts/common.js"></script>
+  <script type="text/javascript" src="scripts/common.js?v<?php echo filemtime('scripts/common.js');?>"></script>
 </head>
 <body>
 <?php include( 'header.inc.php' ); ?>

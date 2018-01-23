@@ -65,9 +65,6 @@ function renderCabinetProps($cab, $audit, $AuditorName){
 	}
 	$renderedHTML.="\t\t\t<tr><td>".__("Tags").":</td><td>".renderTagsToString($cab)."</td></tr>\n";
 
-	//   This is out of context here and makes the information confusing.
-	//    $renderedHTML .= '			<tr><td class="left">' . __('Front Edge') . ':</td>';
-	//    $renderedHTML .= "<td class=\"right\">$cab->FrontEdge </td></tr>\n";
 	$renderedHTML.="\t\t</table>\n";
 
 	return $renderedHTML;
@@ -176,20 +173,25 @@ function renderUnassignedTemplateOwnership($noTemplFlag, $noOwnerFlag, $device) 
 
 	$totalWatts=$stats->Wattage;
 	$totalWeight=$stats->Weight;
-	$totalMoment=0;
 
-	if($config->ParameterArray["ReservedColor"] != "#FFFFFF" || $config->ParameterArray["FreeSpaceColor"] != "#FFFFFF"){
-		$head .= "		<style type=\"text/css\">
-			.reserved {background-color: {$config->ParameterArray['ReservedColor']} !important;}
+	$legend.='<div class="legenditem hide"><span style="background-color:'.$config->ParameterArray['CriticalColor'].'; text-align:center" class="error colorbox border">*</span> - '.__("Above defined rack height").'</div>'."\n";
+
+	// Set up the classes for color coding based upon status
+	$dsList=DeviceStatus::getStatusList();
+
+	$head.="        <style type=\"text/css\">
 			.freespace {background-color: {$config->ParameterArray['FreeSpaceColor']};}\n";
 
-		// Only show reserved in the legend if the color is something other than white 
-		if($config->ParameterArray["ReservedColor"] != "#FFFFFF"){
-			$legend.="\t\t<div class=\"legenditem hide\"><span class=\"reserved colorbox border\"></span> - ".__("Reservation")."</div>\n";
-		}
+	if($config->ParameterArray["FreeSpaceColor"] != "#FFFFFF"){
+		$legend.='<div class="legenditem"><span class="freespace colorbox border"></span> - '.__("Free Space").'</div>'."\n";
+	}
 
-		if($config->ParameterArray["FreeSpaceColor"] != "#FFFFFF"){
-			$legend.='<div class="legenditem"><span class="freespace colorbox border"></span> - '.__("Free Space").'</div>'."\n";
+	foreach($dsList as $stat){
+		if($stat->ColorCode != "#FFFFFF"){
+			$stName=str_replace(' ','_',$stat->Status);
+
+			$head.="\t\t\t.$stName {background-color: {$stat->ColorCode} !important;}\n";
+			$legend.="\t\t<div class=\"legenditem hide\"><span class=\"$stName colorbox border\"></span> - $stat->Status</div>\n";
 		}
 	}
 
@@ -205,10 +207,6 @@ function renderUnassignedTemplateOwnership($noTemplFlag, $noOwnerFlag, $device) 
 	$body.=BuildCabinet($cab->CabinetID);
 	// Generate rear rack view if needed
 	$body.=($backside)?BuildCabinet($cab->CabinetID,'rear'):'';
-
-	$legend.='<div class="legenditem hide"><span style="background-color:'.$config->ParameterArray['CriticalColor'].'; text-align:center" class="error colorbox border">*</span> - '.__("Above defined rack height").'</div>'."\n";
-
-	$CenterofGravity=@round($totalMoment/$totalWeight);
 
 	$used=$cab->CabinetOccupancy($cab->CabinetID);
 	@$SpacePercent=($cab->CabinetHeight>0)?number_format($used/$cab->CabinetHeight*100,0):0;
@@ -291,7 +289,7 @@ $body.='<div id="infopanel">
 			</td>
 		</tr>
 		</table>
-		<p>'.__("Approximate Center of Gravity").': <span id="tippingpoint">'.$CenterofGravity.'</span></p>
+		<p>'.__("Approximate Center of Gravity").': <span id="tippingpoint"></span></p>
 	</fieldset>
 	<fieldset id="keylock">
 		<legend>'.__("Key/Lock Information").'</legend>
@@ -437,7 +435,7 @@ echo $head,'  <script type="text/javascript" src="scripts/jquery.min.js"></scrip
   <script type="text/javascript" src="scripts/jquery-ui.min.js"></script>
   <script type="text/javascript" src="scripts/jquery.cookie.js"></script>
   <script type="text/javascript" src="scripts/jquery-json.min.js"></script>
-  <script type="text/javascript" src="scripts/common.js"></script>
+  <script type="text/javascript" src="scripts/common.js?v',filemtime('scripts/common.js'),'>"></script>
   <script type="text/javascript" src="scripts/masonry.pkgd.min.js"></script>
   <script type="text/javascript">
 	window.weight=',$totalWeight,';

@@ -107,9 +107,7 @@ if(isset($_POST['refresh'])){
   <link rel="stylesheet" href="css/inventory.php" type="text/css">
   <link rel="stylesheet" href="css/print.css" type="text/css" media="print">
   <link rel="stylesheet" href="css/jquery-ui.css" type="text/css">
-  <link rel="stylesheet" href="css/jquery.dataTables.css" type="text/css">
-  <link rel="stylesheet" href="css/ColVis.css" type="text/css">
-  <link rel="stylesheet" href="css/TableTools.css" type="text/css">
+  <link rel="stylesheet" href="css/jquery.dataTables.min.css" type="text/css">
   <style type="text/css"></style>
   <!--[if lt IE 9]>
   <link rel="stylesheet"  href="css/ie.css" type="text/css" />
@@ -117,8 +115,8 @@ if(isset($_POST['refresh'])){
   <script type="text/javascript" src="scripts/jquery.min.js"></script>
   <script type="text/javascript" src="scripts/jquery-ui.min.js"></script>
   <script type="text/javascript" src="scripts/jquery.dataTables.min.js"></script>
-  <script type="text/javascript" src="scripts/ColVis.min.js"></script>
-  <script type="text/javascript" src="scripts/TableTools.min.js"></script>
+  <script type="text/javascript" src="scripts/pdfmake.min.js"></script>
+  <script type="text/javascript" src="scripts/vfs_fonts.js"></script>
   
   <script type="text/javascript">
 	$(document).ready(function(){
@@ -156,14 +154,24 @@ if(isset($_POST['refresh'])){
 
 	function dt(rows){
 		var num_rows=(typeof rows=="undefined")?25:rows;
+		var title='action_log'
 		$('#export').dataTable({
 			"iDisplayLength": num_rows,
-			"sDom": 'CT<"clear">lfrtip',
 			"order": [[ 0, 'desc' ]],
 			"columnDefs": [{"width": "115px", "targets": 0}],
-			"oTableTools": {
-				"sSwfPath": "scripts/copy_csv_xls.swf",
-				"aButtons": ["copy","csv","xls","print"]
+			dom: 'B<"clear">lfrtip',
+			buttons:{
+				buttons: [
+					'copy',
+					{
+						extend: 'excel',
+						title: title
+					},
+					{
+						extend: 'pdf',
+						title: title
+					},'csv', 'colvis', 'print'
+				]
 			}
 		});
 		resize();

@@ -28,6 +28,7 @@
       error_log( "Unable to connect to LDAP Server: " . $config->ParameterArray['LDAPServer']);
     } else {
       ldap_set_option( $ldapConn, LDAP_OPT_PROTOCOL_VERSION, 3 );
+      ldap_set_option( $ldapConn, LDAP_OPT_REFERRALS, 0 );
 
       $ldapUser = htmlspecialchars($_POST['username']);
       $ldapDN = str_replace( "%userid%", $ldapUser, $config->ParameterArray['LDAPBindDN']);
@@ -37,9 +38,16 @@
 
       if ( ! $ldapBind ) {
         $content = "<h3>Login failed.  Incorrect username, password, or rights.</h3>";
+        error_log( __("Unable to bind to specified LDAP server with specified username/password.  Username:") . $ldapUser );
       } else {
         // User was able to authenticate, but might not have authorization to access openDCIM.  Here we check for those rights.
-        $ldapSearch = ldap_search( $ldapConn, $config->ParameterArray['LDAPBaseDN'], "(&(objectClass=posixGroup)(memberUid=$ldapUser))" );
+        /* If this install doesn't have the new parameter, use the old default */
+        if ( !isset($config->ParameterArray['LDAPBaseSearch'])) {
+          $config->ParameterArray['LDAPBaseSearch'] = "(&(objectClass=posixGroup)(memberUid=%userid%))";
+        }
+
+        $ldapSearchDN = str_replace( "%userid%", $ldapUser, html_entity_decode($config->ParameterArray['LDAPBaseSearch']));
+        $ldapSearch = ldap_search( $ldapConn, $config->ParameterArray['LDAPBaseDN'], $ldapSearchDN );
         $ldapResults = ldap_get_entries( $ldapConn, $ldapSearch );
 
         // Because we have audit logs to maintain, we need to make a local copy of the User's record
@@ -62,6 +70,9 @@
             $_SESSION['userid'] = $ldapUser;
             $_SESSION['LoginTime'] = time();
             session_commit();
+            error_log( __("LDAP authentication successful, granted site access based on required group membership.  Username:") . $ldapUser);
+          } else {
+            error_log( __("LDAP authentication successful, but access denied based on lacking group membership.  Username:") . $ldapUser);
           }
 
           if ( $ldapResults[$i]['dn'] == $config->ParameterArray['LDAPReadAccess'] ) {
@@ -92,13 +103,22 @@
               $person->ContactAdmin = true;
           }
           
+          if ( $ldapResults[$i]['dn'] == $config->ParameterArray['LDAPBulkOperations'] ) {
+              $person->BulkOperations = true;
+          }
+
           if ( $ldapResults[$i]['dn'] == $config->ParameterArray['LDAPSiteAdmin'] ) {
               $person->SiteAdmin = true;
           }
         }
 
         // Now get some more info about the user
-        $ldapSearch = ldap_search( $ldapConn, $config->ParameterArray['LDAPBaseDN'], "(|(uid=$ldapUser))" );
+        // Insert the default 4.2 UserSearch string in case this is an upgrade instance
+        if ( ! isset($config->ParameterArray['LDAPUserSearch'])) {
+          $config->ParameterArray['LDAPUserSearch'] = "(|(uid=%userid%))";
+        }
+        $userSearch = str_replace( "%userid%", $ldapUser, html_entity_decode($config->ParameterArray['LDAPUserSearch']));
+        $ldapSearch = ldap_search( $ldapConn, $config->ParameterArray['LDAPBaseDN'], $userSearch );
         $ldapResults = ldap_get_entries( $ldapConn, $ldapSearch );
 
         // These are standard schema items, so they aren't configurable
@@ -121,6 +141,7 @@
           exit;
         } else {
           $content .= "<h3>Login failed.  Incorrect username, password, or rights.</h3>";
+          error_log( __("LDAP Authentication failed for username:") . $ldapUser);
         }
 
       }
@@ -180,8 +201,13 @@ $(document).ready(function() {
 </form>
 
 
-
-
+<div>
+<?php
+if ( file_exists("sitecontact.html")) {
+  include("sitecontact.html");
+}
+?>
+</div>
 </div></div>
 </div><!-- END div.main -->
 </div><!-- END div.page -->

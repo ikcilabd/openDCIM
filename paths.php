@@ -491,7 +491,18 @@ $path.="<script type=\"text/javascript\">
 </script>";
 
 if(isset($_GET['pathonly'])){
+	if(isset($_GET['print'])){
+		echo '<!doctype html>
+<html>
+<head>
+  <meta http-equiv="X-UA-Compatible" content="IE=Edge">
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <link rel="stylesheet" href="css/inventory.php" type="text/css">
+</head>
+<body>';
+	}
 	echo $path;
+	echo $status;
 	exit;
 }
 		
@@ -581,7 +592,7 @@ echo '<div class="main">
 <tr><td>
 <fieldset class="crit_busc">
 		<legend>'.__("Search by path identifier").'</legend>
-<form action="',$_SERVER["PHP_SELF"],'" method="POST">
+<form method="POST">
 <div class="table">
 <br>
 <div>

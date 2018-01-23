@@ -60,11 +60,16 @@
 
   <link rel="stylesheet" href="css/inventory.php" type="text/css">
   <link rel="stylesheet" href="css/jquery-ui.css" type="text/css">
+  <link rel="stylesheet" href="css/validationEngine.jquery.css" type="text/css">
   <!--[if lt IE 9]>
   <link rel="stylesheet"  href="css/ie.css" type="text/css">
   <![endif]-->
   <script type="text/javascript" src="scripts/jquery.min.js"></script>
   <script type="text/javascript" src="scripts/jquery-ui.min.js"></script>
+  <script type="text/javascript" src="scripts/jquery.validationEngine-en.js"></script>
+  <script type="text/javascript" src="scripts/jquery.validationEngine.js"></script>
+  <script type="text/javascript" src="scripts/common.js?v<?php echo filemtime('scripts/common.js');?>"></script>
+
 
 <script type="text/javascript">
 	$(document).ready(function() {
@@ -77,6 +82,10 @@
 				$('#datacenterid').removeAttr('disabled');
 			}
 		}).change();
+
+		$("#cabrowid").combobox();
+		$("#datacenterid").combobox();
+		$("#zoneid").combobox();
 
 		// Input options that are disabled don't submit
 		$('.caption > button').on('click',function(e){
@@ -131,7 +140,7 @@ print "		dialog.find('span + span').html('".__("This Row will be deleted and the
 echo '<div class="main">
 <h3>',$status,'</h3>
 <div class="center"><div>
-<form action="',$_SERVER["PHP_SELF"].$formpatch,'" method="POST">
+<form action="',$_SERVER["SCRIPT_NAME"].$formpatch,'" method="POST">
 <div class="table">
 <div>
    <div><label for="cabrowid">',__("Row"),'</label></div>

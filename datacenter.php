@@ -83,8 +83,8 @@
 	$dir=scandir($path);
 	foreach($dir as $i => $f){
 		if(is_file($path.DIRECTORY_SEPARATOR.$f)){
-			$imageinfo=getimagesize($path.DIRECTORY_SEPARATOR.$f);
-			if(preg_match('/^image/i', $imageinfo['mime'])){
+			$mimeType=mime_content_type($path.DIRECTORY_SEPARATOR.$f);
+			if(preg_match('/^image/i', $mimeType)){
 				$imageselect.="<span>$f</span>\n";
 			}
 		}
@@ -109,6 +109,7 @@
   <script type="text/javascript" src="scripts/jquery-ui.min.js"></script>
   <script type="text/javascript" src="scripts/jquery.validationEngine-en.js"></script>
   <script type="text/javascript" src="scripts/jquery.validationEngine.js"></script>
+  <script type="text/javascript" src="scripts/common.js?v<?php echo filemtime('scripts/common.js');?>"></script>
 
   <script type="text/javascript">
 	$(document).ready(function() {
@@ -233,7 +234,7 @@
 echo '<div class="main">
 <h3>',$status,'</h3>
 <div class="center"><div>
-<form id="datacenterform" action="',$_SERVER["PHP_SELF"],'" method="POST">
+<form id="datacenterform" method="POST">
 <div class="table">
 <div>
    <div><label for="datacenterid">',__("Data Center ID"),'</label></div>
