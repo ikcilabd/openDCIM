@@ -779,7 +779,7 @@
 				$pDev->DeviceID=$dev->ParentDevice;
 				$pDev->GetDevice();
 
-				$parentList=$pDev->GetParentDevices();
+				$parentDev=$dev->WhosYourDaddy();
 
 				//$cab->CabinetID=$pDev->Cabinet;
 				//JMGA: changed for multichassis
@@ -808,6 +808,25 @@
 		// sets install date to today when a new device is being created
 		$dev->InstallDate=date("Y-m-d");
 	}
+
+	//Pull Parent List
+	if(isset($_POST['get_parent_list'])){
+		$parentList=$dev->GetParentDevices();
+		$return_parent_text = "";
+		foreach($parentList as $parDev){
+			//No making yourself a parent of yourself...thats just sick
+			if($dev->DeviceID!=$parDev->DeviceID){
+				//Select current parent
+				if($parentDev->DeviceID==$parDev->DeviceID){$selected=" selected";}else{$selected="";}
+
+				$return_parent_text .= "<option value=\"$parDev->DeviceID\" $selected data-ChassisSlots=$parDev->ChassisSlots data-RearChassisSlots=$parDev->RearChassisSlots data-CabinetID=$parDev->Cabinet>$parDev->Label</option>";
+				}
+			}
+		echo $return_parent_text;
+		exit;
+	}
+
+
 
 	// We don't want someone accidentally adding a chassis device inside of a chassis slot.
 	if($dev->ParentDevice>0){
@@ -1847,12 +1866,10 @@ echo '
 		</div>
 		<div>
 			<div><label for=\"ParentDevice\">".__("Parent Device")."</label></div>
-			<div><select name=\"ParentDevice\">\n";
+			<div><select name=\"ParentDevice\" id=\"parent_device_dropdown\">\n";
 
-			foreach($parentList as $parDev){
-				if($pDev->DeviceID==$parDev->DeviceID){$selected=" selected";}else{$selected="";}
-				print "\t\t\t\t<option value=\"$parDev->DeviceID\"$selected data-ChassisSlots=$parDev->ChassisSlots data-RearChassisSlots=$parDev->RearChassisSlots data-CabinetID=$parDev->Cabinet>$parDev->Label</option>\n";
-			}
+			print "\t\t\t\t<option value=\"$parentDev->DeviceID\"$selected data-ChassisSlots=$parentDev->ChassisSlots data-RearChassisSlots=$parentDev->RearChassisSlots data-CabinetID=$parentDev->Cabinet>$parentDev->Label</option>\n";
+
 			print "\t\t\t</select></div>\n";
 		}
 
@@ -2634,10 +2651,23 @@ $connectioncontrols.=($dev->DeviceID>0 && !empty($portList))?'
 			});
 		});
 
+		//To cutdown on load time, this will initiate build the parent list the first click of the Parent dropdown
+		var parent_list_pulled = false;
+		$('#parent_device_dropdown').click(function(){
+			if(!parent_list_pulled){
+					parent_list_pulled = true;
+					document.getElementById('parent_device_dropdown').innerHTML	= "<option>Loading Parent List...</option>";
+					$.post('', {get_parent_list:true}, function(data){
+						document.getElementById("parent_device_dropdown").innerHTML = data;
+						$('select[name=ParentDevice]').combobox();
+					});
+
+			}		
+		});
+
 		// Make the cabinet and template selections smart comboboxes
 		$('#CabinetID').combobox();
 		$('#TemplateID').combobox();
-		$('select[name=ParentDevice]').combobox();
 
 		// Hide this for now
 		$('#devicetype-limiter').parent('div').hide();
